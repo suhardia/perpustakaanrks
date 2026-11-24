@@ -19,8 +19,18 @@ export default async function HalamanMasuk(props: PageProps<"/masuk">) {
         <form action={masuk} className="space-y-4">
           <input type="hidden" name="lanjut" value={lanjut} />
           <div>
-            <label className="label" htmlFor="email">Email</label>
-            <input id="email" name="email" type="email" required autoComplete="email" className="input" />
+            <label className="label" htmlFor="identitas">Email atau nama pengguna</label>
+            <input
+              id="identitas"
+              name="identitas"
+              required
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              className="input"
+              placeholder="anggota@email.com / nama pengguna pustakawan"
+            />
+            <p className="mt-1 text-xs text-tinta-2">Anggota: gunakan email. Pustakawan: boleh memakai nama pengguna.</p>
           </div>
           <div>
             <label className="label" htmlFor="password">Password</label>

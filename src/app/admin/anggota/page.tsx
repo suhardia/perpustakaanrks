@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Flash from "@/components/Flash";
 import Tombol from "@/components/Tombol";
-import { ubahRole } from "@/app/actions/admin";
+import { aturUsername, ubahRole } from "@/app/actions/admin";
 import { createClient } from "@/lib/supabase/server";
 import { wajibAdmin } from "@/lib/auth";
 import { bersihkanCari, tanggal } from "@/lib/format";
@@ -32,7 +32,8 @@ export default async function AnggotaPage(props: PageProps<"/admin/anggota">) {
         <h1 className="text-2xl font-semibold">Anggota &amp; Pengguna</h1>
         <p className="text-sm text-tinta-2">
           Anggota mendaftar sendiri melalui halaman <strong>Daftar Anggota</strong>. Di sini Anda bisa melihat riwayat dan
-          menjadikan seseorang pustakawan.
+          menjadikan seseorang pustakawan. Pustakawan masuk dengan <strong>nama pengguna + password</strong>; atur nama
+          penggunanya di kolom “Nama pengguna”.
         </p>
       </div>
       <Flash pesan={sp.pesan} error={sp.error} />
@@ -44,7 +45,7 @@ export default async function AnggotaPage(props: PageProps<"/admin/anggota">) {
 
       <div className="kartu overflow-x-auto">
         <table className="tabel">
-          <thead><tr><th>No. Anggota</th><th>Nama</th><th>Kontak</th><th>Peran</th><th>Pinjaman aktif</th><th>Terdaftar</th><th></th></tr></thead>
+          <thead><tr><th>No. Anggota</th><th>Nama</th><th>Kontak</th><th>Peran</th><th>Nama pengguna</th><th>Pinjaman aktif</th><th>Terdaftar</th><th></th></tr></thead>
           <tbody>
             {profil.map((p) => (
               <tr key={p.id}>
@@ -58,6 +59,25 @@ export default async function AnggotaPage(props: PageProps<"/admin/anggota">) {
                     {p.role === "admin" ? "Pustakawan" : "Anggota"}
                   </span>
                 </td>
+                <td>
+                  {p.role === "admin" ? (
+                    <form action={aturUsername} className="flex gap-1">
+                      <input type="hidden" name="user_id" value={p.id} />
+                      <input type="hidden" name="kembali" value="/admin/anggota" />
+                      <input
+                        name="username"
+                        defaultValue={p.username ?? ""}
+                        placeholder="belum diatur"
+                        pattern="[A-Za-z0-9_.]{3,30}"
+                        title="3–30 karakter: huruf, angka, titik, atau garis bawah"
+                        className="input w-36 py-1 font-mono text-xs"
+                      />
+                      <Tombol className="btn-garis btn-kecil">Simpan</Tombol>
+                    </form>
+                  ) : (
+                    <span className="text-xs text-tinta-2">-</span>
+                  )}
+                </td>
                 <td>{jumlahAktif.get(p.id) ?? 0}</td>
                 <td className="text-xs text-tinta-2">{tanggal(p.created_at)}</td>
                 <td className="text-right">
@@ -67,7 +87,11 @@ export default async function AnggotaPage(props: PageProps<"/admin/anggota">) {
                       <input type="hidden" name="role" value={p.role === "admin" ? "anggota" : "admin"} />
                       <Tombol
                         className="btn-garis btn-kecil"
-                        konfirmasi={p.role === "admin" ? `Jadikan ${p.nama} anggota biasa?` : `Jadikan ${p.nama} pustakawan? Ia akan bisa mengelola seluruh data.`}
+                        konfirmasi={
+                          p.role === "admin"
+                            ? `Jadikan ${p.nama} anggota biasa? Ia tidak bisa lagi masuk dengan nama pengguna.`
+                            : `Jadikan ${p.nama} pustakawan? Ia akan bisa mengelola seluruh data. Setelah itu, atur nama penggunanya.`
+                        }
                       >
                         {p.role === "admin" ? "Jadikan anggota" : "Jadikan pustakawan"}
                       </Tombol>

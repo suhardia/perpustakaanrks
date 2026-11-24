@@ -12,21 +12,32 @@ function lanjutAman(v: FormDataEntryValue | null): string {
 }
 
 export async function masuk(form: FormData) {
-  const email = String(form.get("email") ?? "").trim();
+  // Anggota masuk dengan email; pustakawan boleh memakai nama pengguna
+  const identitas = String(form.get("identitas") ?? "").trim();
   const password = String(form.get("password") ?? "");
   const lanjut = lanjutAman(form.get("lanjut"));
   const balik = `/masuk?lanjut=${encodeURIComponent(lanjut)}`;
 
-  if (!email || !password) gagal(balik, "Email dan password wajib diisi.");
+  if (!identitas || !password) gagal(balik, "Email/nama pengguna dan password wajib diisi.");
 
   const supabase = await createClient();
+  let email = identitas;
+  const pakaiUsername = !identitas.includes("@");
+  if (pakaiUsername) {
+    const { data } = await supabase.rpc("email_untuk_login", { p_username: identitas });
+    if (!data) gagal(balik, "Nama pengguna atau password salah.");
+    email = data as string;
+  }
+
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
     gagal(
       balik,
       error.message.includes("Email not confirmed")
         ? "Email belum dikonfirmasi. Buka tautan konfirmasi di kotak masuk email Anda."
-        : "Email atau password salah.",
+        : pakaiUsername
+          ? "Nama pengguna atau password salah."
+          : "Email atau password salah.",
     );
   }
 

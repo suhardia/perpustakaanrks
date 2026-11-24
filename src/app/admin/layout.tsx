@@ -11,6 +11,7 @@ const MENU = [
   ["/admin/anggota", "Anggota"],
   ["/admin/laporan", "Laporan"],
   ["/admin/pengaturan", "Pengaturan"],
+  ["/admin/akun", "Akun Saya"],
 ] as const;
 
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {

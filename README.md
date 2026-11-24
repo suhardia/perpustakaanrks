@@ -18,6 +18,7 @@ disimpan di **GitHub** dan di-deploy ke **Vercel**.
   perpanjangan, dan riwayat.
 
 **Admin/Pustakawan**
+- Masuk dengan **nama pengguna + password** (bisa diatur di menu *Akun Saya*).
 - Dashboard: statistik, buku siap diambil, dan daftar keterlambatan.
 - **Sirkulasi**: catat peminjaman di meja layanan, pengembalian (denda dihitung otomatis), dan perpanjangan.
 - **Antrian**: serahkan buku ke anggota yang mendapat giliran, atau batalkan antrian.
@@ -44,6 +45,7 @@ GitHub ── push ──► Vercel otomatis build & deploy ulang
 |---|---|
 | `supabase/schema.sql` | Seluruh skema database: tabel, view, fungsi, RLS, dan bucket storage |
 | `supabase/seed.sql` | Contoh kategori & 8 buku |
+| `supabase/migrasi-01-username-admin.sql` | Tambahan login pustakawan dengan nama pengguna (untuk database lama) |
 | `src/app/` | Halaman: beranda, detail buku, masuk/daftar, akun, admin |
 | `src/app/actions/` | Server Actions (pinjam, antre, kembalikan, simpan buku, …) |
 | `src/lib/` | Klien Supabase, tipe data, helper format |
@@ -103,15 +105,36 @@ Buka http://localhost:3000.
 
 Setiap `git push` ke branch `main` akan otomatis di-deploy ulang oleh Vercel.
 
-## Langkah 5: Buat akun Pustakawan pertama
+## Langkah 5: Buat akun Pustakawan (login dengan nama pengguna + password)
 
-1. Buka website, klik **Daftar Anggota**, lalu daftar dengan email Anda.
-2. Di Supabase **SQL Editor**, jalankan:
+Pustakawan masuk memakai **nama pengguna + password**, sedangkan anggota memakai **email + password**.
+Keduanya lewat halaman **Masuk** yang sama.
+
+> Supabase Auth tetap membutuhkan email untuk setiap akun. Nama pengguna hanyalah “alias” yang dipetakan ke
+> email akun pustakawan, jadi email tetap diisi saat membuat akun.
+
+**Pustakawan pertama:**
+1. Buat akunnya dengan salah satu cara berikut:
+   - lewat website: klik **Daftar Anggota**, atau
+   - di Supabase: **Authentication → Users → Add user → Create new user**. Isi email dan password, lalu centang **Auto Confirm User**.
+2. Di Supabase **SQL Editor**, jadikan akun itu pustakawan sekaligus beri nama pengguna:
    ```sql
-   update public.profiles set role = 'admin' where email = 'email-anda@contoh.com';
+   update public.profiles
+   set role = 'admin', username = 'admin'
+   where email = 'email-anda@contoh.com';
    ```
-3. Keluar lalu masuk lagi. Menu **Panel Pustakawan** akan muncul. Pustakawan berikutnya bisa diangkat langsung dari
-   menu **Anggota → Jadikan pustakawan**.
+3. Buka website → **Masuk** → isi nama pengguna `admin` dan password akun tersebut.
+
+**Pustakawan berikutnya:** buka **Panel Pustakawan → Anggota**, klik **Jadikan pustakawan** pada orangnya, lalu
+isi kolom **Nama pengguna**.
+
+**Mengubah nama pengguna atau password sendiri:** buka **Panel Pustakawan → Akun Saya**.
+
+Aturan nama pengguna: 3–30 karakter (huruf, angka, titik, garis bawah, tanpa spasi). Huruf besar dan kecil dianggap
+sama. Hanya akun berperan pustakawan yang bisa masuk memakai nama pengguna.
+
+**Sudah menjalankan `schema.sql` versi sebelumnya?** Jalankan juga `supabase/migrasi-01-username-admin.sql` sekali di
+SQL Editor.
 
 ---
 
@@ -148,3 +171,5 @@ select cron.schedule('antrian-kedaluwarsa', '0 * * * *', $$select public.proses_
 | Tautan konfirmasi email membuka `localhost` | Atur **Site URL** dan **Redirect URLs** di Supabase (Langkah 4.5). |
 | Upload cover gagal | Pastikan bagian Storage di `schema.sql` ikut dijalankan (bucket `cover`) dan akun Anda berperan admin. Ukuran maksimal 2 MB. |
 | Tidak muncul menu Panel Pustakawan | Jalankan SQL di Langkah 5, lalu keluar dan masuk lagi. |
+| “Nama pengguna atau password salah” padahal benar | Pastikan akun berperan `admin` dan kolom `username` terisi (cek di Table Editor → profiles). Jika database dibuat sebelum fitur ini, jalankan `migrasi-01-username-admin.sql`. |
+| Ganti password gagal “reauthentication” | Di Supabase: Authentication → Sign In / Providers → Email → matikan **Secure password change**, atau keluar lalu masuk kembali. |

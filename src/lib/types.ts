@@ -8,6 +8,8 @@ export interface Profil {
   nama: string;
   role: Role;
   no_anggota: string | null;
+  /** nama pengguna untuk login pustakawan */
+  username: string | null;
   no_hp: string | null;
   alamat: string | null;
   created_at: string;

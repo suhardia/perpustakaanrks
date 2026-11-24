@@ -206,3 +206,52 @@ export async function simpanPengaturan(form: FormData) {
   segarkan();
   sukses("/admin/pengaturan", "Pengaturan disimpan.");
 }
+
+// ===================== AKUN PUSTAKAWAN =====================
+
+/** Mengatur nama pengguna login pustakawan (milik sendiri atau pustakawan lain). */
+export async function aturUsername(form: FormData) {
+  const saya = await wajibAdmin();
+  const kembali = pathKembali(form, "/admin/akun");
+  const userId = String(form.get("user_id") ?? "") || saya.id;
+  const username = String(form.get("username") ?? "").trim();
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("atur_username", { p_user_id: userId, p_username: username });
+  if (error) gagal(kembali, pesanError(error));
+  segarkan();
+  sukses(kembali, username ? `Nama pengguna diatur menjadi "${username}".` : "Nama pengguna dihapus.");
+}
+
+/** Mengubah nama tampilan akun pustakawan sendiri. */
+export async function ubahNamaAdmin(form: FormData) {
+  const saya = await wajibAdmin();
+  const nama = String(form.get("nama") ?? "").trim();
+  if (!nama) gagal("/admin/akun", "Nama wajib diisi.");
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ nama }).eq("id", saya.id);
+  if (error) gagal("/admin/akun", pesanError(error));
+  segarkan();
+  sukses("/admin/akun", "Nama disimpan.");
+}
+
+/** Mengganti password akun yang sedang masuk. */
+export async function gantiPassword(form: FormData) {
+  await wajibAdmin();
+  const password = String(form.get("password") ?? "");
+  const ulangi = String(form.get("ulangi") ?? "");
+  if (password.length < 8) gagal("/admin/akun", "Password pustakawan minimal 8 karakter.");
+  if (password !== ulangi) gagal("/admin/akun", "Konfirmasi password tidak sama.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    gagal(
+      "/admin/akun",
+      error.message.toLowerCase().includes("reauthentication")
+        ? "Supabase meminta verifikasi ulang. Matikan opsi 'Secure password change' di Supabase, atau keluar lalu masuk kembali dan coba lagi."
+        : error.message.includes("different") ? "Password baru harus berbeda dari password lama." : error.message,
+    );
+  }
+  sukses("/admin/akun", "Password berhasil diganti.");
+}

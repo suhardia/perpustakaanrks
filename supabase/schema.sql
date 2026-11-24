@@ -584,3 +584,52 @@ create policy "cover diubah admin" on storage.objects for update to authenticate
 drop policy if exists "cover dihapus admin" on storage.objects;
 create policy "cover dihapus admin" on storage.objects for delete to authenticated
   using (bucket_id = 'cover' and public.is_admin());
+
+-- ---------------------------------------------------------------------
+-- 10. LOGIN PUSTAKAWAN DENGAN NAMA PENGGUNA (sama dengan migrasi-01-username-admin.sql)
+-- ---------------------------------------------------------------------
+-- Kolom nama pengguna (hanya dipakai akun pustakawan)
+alter table public.profiles add column if not exists username text;
+
+create unique index if not exists profiles_username_unik on public.profiles (lower(username));
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_username_format') then
+    alter table public.profiles add constraint profiles_username_format
+      check (username is null or username ~ '^[A-Za-z0-9_.]{3,30}$');
+  end if;
+end $$;
+
+-- Mengubah nama pengguna -> email akun pustakawan, dipakai saat login.
+-- Hanya akun ber-role admin yang bisa masuk memakai nama pengguna.
+-- (Password tetap diperiksa oleh Supabase Auth, lengkap dengan pembatasan percobaan login.)
+create or replace function public.email_untuk_login(p_username text)
+returns text language sql stable security definer set search_path = public as $$
+  select email from public.profiles
+  where lower(username) = lower(trim(p_username)) and role = 'admin'
+  limit 1;
+$$;
+
+-- PUSTAKAWAN: mengatur nama pengguna (milik sendiri atau pustakawan lain)
+create or replace function public.atur_username(p_user_id uuid, p_username text)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_u text := nullif(trim(p_username), '');
+begin
+  if not public.is_admin() then raise exception 'Hanya pustakawan.'; end if;
+  if v_u is not null and v_u !~ '^[A-Za-z0-9_.]{3,30}$' then
+    raise exception 'Nama pengguna 3–30 karakter, hanya huruf, angka, titik, atau garis bawah (tanpa spasi).';
+  end if;
+  if v_u is not null and exists (
+    select 1 from public.profiles where lower(username) = lower(v_u) and id <> p_user_id
+  ) then
+    raise exception 'Nama pengguna "%" sudah dipakai.', v_u;
+  end if;
+  update public.profiles set username = v_u where id = p_user_id;
+end $$;
+
+revoke execute on function public.email_untuk_login(text)  from public;
+grant  execute on function public.email_untuk_login(text)  to anon, authenticated;
+revoke execute on function public.atur_username(uuid, text) from public, anon;
+grant  execute on function public.atur_username(uuid, text) to authenticated;
