@@ -45,6 +45,7 @@ GitHub ── push ──► Vercel otomatis build & deploy ulang
 |---|---|
 | `supabase/schema.sql` | Seluruh skema database: tabel, view, fungsi, RLS, dan bucket storage |
 | `supabase/seed.sql` | Contoh kategori & 8 buku |
+| `supabase/perbaiki-fungsi-login.sql` | Memperbaiki fungsi login nama pengguna (izin & cache API) |
 | `supabase/perbaiki-akun-admin.sql` | Diagnosis & perbaikan akun pustakawan yang tidak bisa masuk |
 | `supabase/migrasi-01-username-admin.sql` | Tambahan login pustakawan dengan nama pengguna (untuk database lama) |
 | `src/app/` | Halaman: beranda, detail buku, masuk/daftar, akun, admin |
@@ -172,6 +173,7 @@ select cron.schedule('antrian-kedaluwarsa', '0 * * * *', $$select public.proses_
 | Tautan konfirmasi email membuka `localhost` | Atur **Site URL** dan **Redirect URLs** di Supabase (Langkah 4.5). |
 | Upload cover gagal | Pastikan bagian Storage di `schema.sql` ikut dijalankan (bucket `cover`) dan akun Anda berperan admin. Ukuran maksimal 2 MB. |
 | Tidak muncul menu Panel Pustakawan | Jalankan SQL di Langkah 5, lalu keluar dan masuk lagi. |
+| “API Supabase belum mengenali fungsi email_untuk_login” | Jalankan `supabase/perbaiki-fungsi-login.sql`. Pastikan juga `NEXT_PUBLIC_SUPABASE_URL` di Vercel sama dengan Project URL proyek Supabase tempat SQL dijalankan. |
 | Gagal masuk dengan nama pengguna | Jalankan `supabase/perbaiki-akun-admin.sql` (Langkah 1 untuk diagnosis, Langkah 2 untuk perbaikan). Pesan error di halaman Masuk menunjukkan penyebabnya. |
 | “Nama pengguna atau password salah” padahal benar | Pastikan akun berperan `admin` dan kolom `username` terisi (cek di Table Editor → profiles). Jika database dibuat sebelum fitur ini, jalankan `migrasi-01-username-admin.sql`. |
 | Ganti password gagal “reauthentication” | Di Supabase: Authentication → Sign In / Providers → Email → matikan **Secure password change**, atau keluar lalu masuk kembali. |

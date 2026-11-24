@@ -26,13 +26,19 @@ export async function masuk(form: FormData) {
   if (pakaiUsername) {
     const { data, error: rpcError } = await supabase.rpc("email_untuk_login", { p_username: identitas });
     if (rpcError) {
-      // Biasanya: fungsi belum dibuat karena migrasi belum dijalankan, atau kunci Supabase salah
       console.error("email_untuk_login gagal:", rpcError);
+      const kode = rpcError.code ?? "";
+      const sebab =
+        kode === "PGRST202"
+          ? "API Supabase belum mengenali fungsi email_untuk_login (cache skema belum dimuat ulang, atau fungsi belum dibuat di proyek Supabase yang dipakai website)."
+          : kode === "42501"
+            ? "Fungsi email_untuk_login ada, tetapi belum diberi izin eksekusi untuk pengunjung (anon)."
+            : kode === "42883"
+              ? "Fungsi email_untuk_login belum dibuat di database."
+              : "Gagal memanggil fungsi email_untuk_login.";
       gagal(
         balik,
-        rpcError.code === "PGRST202" || rpcError.message.includes("email_untuk_login")
-          ? "Login dengan nama pengguna belum aktif di database. Jalankan supabase/migrasi-01-username-admin.sql di Supabase SQL Editor."
-          : `Tidak dapat menghubungi database: ${rpcError.message}`,
+        `${sebab} Jalankan supabase/perbaiki-fungsi-login.sql di Supabase SQL Editor. [${kode || "tanpa kode"}: ${rpcError.message}]`,
       );
     }
     if (!data) {

@@ -68,3 +68,6 @@ grant  execute on function public.atur_username(uuid, text) to authenticated;
 --        where email = 'email-anda@contoh.com';
 --   3. Masuk di website dengan nama pengguna: admin + password akun tersebut.
 -- ---------------------------------------------------------------------
+
+-- Muat ulang cache API Supabase agar tabel/fungsi baru langsung dikenali
+notify pgrst, 'reload schema';

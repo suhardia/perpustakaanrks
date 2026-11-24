@@ -640,3 +640,6 @@ revoke execute on function public.email_untuk_login(text)  from public;
 grant  execute on function public.email_untuk_login(text)  to anon, authenticated;
 revoke execute on function public.atur_username(uuid, text) from public, anon;
 grant  execute on function public.atur_username(uuid, text) to authenticated;
+
+-- Muat ulang cache API Supabase agar tabel/fungsi baru langsung dikenali
+notify pgrst, 'reload schema';
