@@ -62,6 +62,13 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- Akun yang dibuat SEBELUM file ini dijalankan belum punya profil -> buatkan sekarang
+insert into public.profiles (id, email, nama, no_anggota)
+select u.id, u.email, coalesce(nullif(u.raw_user_meta_data ->> 'nama', ''), split_part(u.email, '@', 1)),
+       'AGT' || lpad(nextval('public.no_anggota_seq')::text, 5, '0')
+from auth.users u
+where not exists (select 1 from public.profiles p where p.id = u.id);
+
 create or replace function public.is_admin()
 returns boolean language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin');

@@ -5,6 +5,13 @@
 --  - Untuk instalasi baru, isi file ini sudah termasuk di akhir schema.sql.
 -- =====================================================================
 
+-- Akun yang dibuat SEBELUM file ini dijalankan belum punya profil -> buatkan sekarang
+insert into public.profiles (id, email, nama, no_anggota)
+select u.id, u.email, coalesce(nullif(u.raw_user_meta_data ->> 'nama', ''), split_part(u.email, '@', 1)),
+       'AGT' || lpad(nextval('public.no_anggota_seq')::text, 5, '0')
+from auth.users u
+where not exists (select 1 from public.profiles p where p.id = u.id);
+
 -- Kolom nama pengguna (hanya dipakai akun pustakawan)
 alter table public.profiles add column if not exists username text;
 

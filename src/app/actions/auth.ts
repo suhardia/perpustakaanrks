@@ -24,8 +24,23 @@ export async function masuk(form: FormData) {
   let email = identitas;
   const pakaiUsername = !identitas.includes("@");
   if (pakaiUsername) {
-    const { data } = await supabase.rpc("email_untuk_login", { p_username: identitas });
-    if (!data) gagal(balik, "Nama pengguna atau password salah.");
+    const { data, error: rpcError } = await supabase.rpc("email_untuk_login", { p_username: identitas });
+    if (rpcError) {
+      // Biasanya: fungsi belum dibuat karena migrasi belum dijalankan, atau kunci Supabase salah
+      console.error("email_untuk_login gagal:", rpcError);
+      gagal(
+        balik,
+        rpcError.code === "PGRST202" || rpcError.message.includes("email_untuk_login")
+          ? "Login dengan nama pengguna belum aktif di database. Jalankan supabase/migrasi-01-username-admin.sql di Supabase SQL Editor."
+          : `Tidak dapat menghubungi database: ${rpcError.message}`,
+      );
+    }
+    if (!data) {
+      gagal(
+        balik,
+        `Nama pengguna "${identitas}" tidak terdaftar sebagai pustakawan. Periksa kolom username & role di tabel profiles, atau masuk dengan email.`,
+      );
+    }
     email = data as string;
   }
 
@@ -36,7 +51,7 @@ export async function masuk(form: FormData) {
       error.message.includes("Email not confirmed")
         ? "Email belum dikonfirmasi. Buka tautan konfirmasi di kotak masuk email Anda."
         : pakaiUsername
-          ? "Nama pengguna atau password salah."
+          ? "Password salah untuk nama pengguna ini."
           : "Email atau password salah.",
     );
   }
