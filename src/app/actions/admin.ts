@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { gagal, pathKembali, pesanError, sukses } from "@/lib/aksi";
 import { rupiah } from "@/lib/format";
 import { wajibAdmin } from "@/lib/auth";
+import { ambilBuku, keBaris } from "@/lib/bukuIndonesia";
 
 const MAKS_COVER = 2 * 1024 * 1024;
 
@@ -254,4 +255,79 @@ export async function gantiPassword(form: FormData) {
     );
   }
   sukses("/admin/akun", "Password berhasil diganti.");
+}
+
+// ===================== IMPOR DARI API BUKU INDONESIA =====================
+
+/** Mengimpor buku terpilih dari API Buku Indonesia beserta jumlah eksemplarnya. */
+export async function imporBuku(form: FormData) {
+  await wajibAdmin();
+  const kembali = pathKembali(form, "/admin/impor");
+  const ids = [...new Set(form.getAll("pilih").map(String))].filter((id) => /^bk_[a-z0-9]+$/i.test(id)).slice(0, 60);
+  if (ids.length === 0) gagal(kembali, "Centang minimal satu buku yang ingin diimpor.");
+
+  const angka = (v: FormDataEntryValue | null, bawaan: number) => {
+    const n = Number(v);
+    return Number.isInteger(n) && n >= 0 && n <= 10000 ? n : bawaan;
+  };
+  const jumlahBawaan = angka(form.get("jumlah_bawaan"), 1);
+  const kategoriTetap = Number(form.get("kategori_tujuan")) || null; // 0 = ikuti kategori API
+
+  // Ambil detail tiap buku dari API (paralel)
+  const hasil = await Promise.all(ids.map((id) => ambilBuku(id).catch(() => null)));
+  const bukuApi = hasil.filter((b): b is NonNullable<typeof b> => b !== null);
+  const gagalAmbil = ids.length - bukuApi.length;
+
+  const supabase = await createClient();
+
+  // Lewati buku yang sudah ada (berdasarkan ID sumber atau ISBN)
+  const isbnBaru = bukuApi.map((b) => b.isbn13 ?? b.isbn10).filter((x): x is string => Boolean(x));
+  const [{ data: adaSumber }, { data: adaIsbn }] = await Promise.all([
+    supabase.from("buku").select("sumber_id").in("sumber_id", bukuApi.map((b) => b.id)),
+    isbnBaru.length ? supabase.from("buku").select("isbn").in("isbn", isbnBaru) : Promise.resolve({ data: [] }),
+  ]);
+  const sudahAda = new Set<string>([
+    ...((adaSumber ?? []) as { sumber_id: string }[]).map((r) => r.sumber_id),
+    ...((adaIsbn ?? []) as { isbn: string }[]).map((r) => `isbn:${r.isbn}`),
+  ]);
+
+  // Siapkan kategori lokal (dibuat otomatis jika belum ada)
+  const petaKategori = new Map<string, number>();
+  if (!kategoriTetap) {
+    const namaDibutuhkan = [...new Set(bukuApi.map((b) => b.categories?.[0]).filter((x): x is string => Boolean(x)))];
+    const { data: katAda } = await supabase.from("kategori").select("id, nama");
+    for (const k of (katAda ?? []) as { id: number; nama: string }[]) petaKategori.set(k.nama.toLowerCase(), k.id);
+    const kurang = namaDibutuhkan.filter((n) => !petaKategori.has(n.toLowerCase()));
+    if (kurang.length) {
+      const { data: baru, error } = await supabase.from("kategori").insert(kurang.map((nama) => ({ nama }))).select("id, nama");
+      if (error) gagal(kembali, `Gagal membuat kategori: ${pesanError(error)}`);
+      for (const k of (baru ?? []) as { id: number; nama: string }[]) petaKategori.set(k.nama.toLowerCase(), k.id);
+    }
+  }
+
+  const isbnDipakai = new Set<string>();
+  const baris = [];
+  let dilewati = 0;
+  for (const b of bukuApi) {
+    const isbn = b.isbn13 ?? b.isbn10 ?? null;
+    if (sudahAda.has(b.id) || (isbn && (sudahAda.has(`isbn:${isbn}`) || isbnDipakai.has(isbn)))) {
+      dilewati++;
+      continue;
+    }
+    if (isbn) isbnDipakai.add(isbn);
+    const kat = kategoriTetap ?? petaKategori.get((b.categories?.[0] ?? "").toLowerCase()) ?? null;
+    baris.push(keBaris(b, angka(form.get(`jumlah_${b.id}`), jumlahBawaan), kat));
+  }
+
+  if (baris.length > 0) {
+    const { error } = await supabase.from("buku").insert(baris);
+    if (error) gagal(kembali, `Impor gagal: ${pesanError(error)}`);
+  }
+
+  segarkan();
+  const info = [`${baris.length} buku diimpor ke koleksi.`];
+  if (dilewati) info.push(`${dilewati} dilewati karena sudah ada.`);
+  if (gagalAmbil) info.push(`${gagalAmbil} gagal diambil dari API.`);
+  if (baris.length) info.push("Sinopsis belum tersedia dari API — lengkapi lewat menu Buku → Ubah.");
+  sukses(kembali, info.join(" "));
 }

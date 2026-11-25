@@ -29,6 +29,7 @@ export default async function DetailBuku(props: PageProps<"/buku/[id]">) {
     ["ISBN", buku.isbn],
     ["Kategori", buku.kategori_nama],
     ["Lokasi rak", buku.rak],
+    ["Jumlah halaman", buku.halaman ?? null],
     ["Jumlah eksemplar", buku.jumlah],
   ];
 

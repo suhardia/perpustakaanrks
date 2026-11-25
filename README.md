@@ -9,6 +9,10 @@ disimpan di **GitHub** dan di-deploy ke **Vercel**.
 - Koleksi buku dengan **cover, sinopsis, kategori**, pencarian, dan filter.
 - **Status peminjaman** tiap buku: tersedia X dari Y, atau sedang dipinjam beserta perkiraan tanggal kembali dan jumlah orang yang mengantre.
 
+- **Quote acak** di halaman depan, diambil dari [Quotes Indonesia](https://quotes.liupurnomo.com) (bahasa Indonesia)
+  atau [Recite](https://recite-flax.vercel.app) (kutipan buku, bahasa Inggris). Jika satu API gagal, otomatis memakai
+  yang lain; jika keduanya gagal, kartu quote disembunyikan.
+
 **Anggota**
 - Daftar dan masuk sendiri; nomor anggota (mis. `AGT00012`) dibuat otomatis.
 - **Ajukan pinjam**: jika buku tersedia, eksemplar langsung disisihkan untuk diambil di meja pustakawan.
@@ -22,6 +26,9 @@ disimpan di **GitHub** dan di-deploy ke **Vercel**.
 - Dashboard: statistik, buku siap diambil, dan daftar keterlambatan.
 - **Sirkulasi**: catat peminjaman di meja layanan, pengembalian (denda dihitung otomatis), dan perpanjangan.
 - **Antrian**: serahkan buku ke anggota yang mendapat giliran, atau batalkan antrian.
+- **Impor Katalog** dari API [Buku Indonesia](https://github.com/khrlanamm/buku-indonesia) (±3.000 judul, data CC0):
+  cari, centang buku yang dimiliki, isi **jumlah eksemplar**, lalu impor. Judul, pengarang, penerbit, tahun, ISBN,
+  kategori, halaman, dan cover (Open Library) terisi otomatis. API ini tidak menyediakan sinopsis, jadi isi manual.
 - Kelola **buku** (upload cover ke Supabase Storage), **kategori**, dan **anggota** (termasuk menjadikan seseorang pustakawan).
 - **Laporan** per periode, buku terpopuler, dan ekspor CSV untuk Excel.
 - **Pengaturan**: lama pinjam, denda, batas pinjam/antrian, batas waktu pengambilan, dan zona waktu.
@@ -45,6 +52,9 @@ GitHub ── push ──► Vercel otomatis build & deploy ulang
 |---|---|
 | `supabase/schema.sql` | Seluruh skema database: tabel, view, fungsi, RLS, dan bucket storage |
 | `supabase/seed.sql` | Contoh kategori & 8 buku |
+| `supabase/migrasi-02-impor-buku.sql` | Kolom tambahan untuk fitur Impor Katalog (untuk database lama) |
+| `src/lib/bukuIndonesia.ts` | Klien API Buku Indonesia & pemetaan ke tabel buku |
+| `src/app/api/quote/route.ts` | Proksi quote acak (Quotes Indonesia / Recite) |
 | `supabase/perbaiki-fungsi-login.sql` | Memperbaiki fungsi login nama pengguna (izin & cache API) |
 | `supabase/perbaiki-akun-admin.sql` | Diagnosis & perbaikan akun pustakawan yang tidak bisa masuk |
 | `supabase/migrasi-01-username-admin.sql` | Tambahan login pustakawan dengan nama pengguna (untuk database lama) |
@@ -139,6 +149,19 @@ sama. Hanya akun berperan pustakawan yang bisa masuk memakai nama pengguna.
 SQL Editor.
 
 ---
+
+## Mengisi katalog dari API Buku Indonesia
+
+1. Jika database dibuat sebelum fitur ini, jalankan sekali `supabase/migrasi-02-impor-buku.sql` di SQL Editor.
+2. Masuk sebagai pustakawan → **Panel Pustakawan → Impor Katalog**.
+3. Cari judul atau pengarang (atau saring per kategori), lalu centang buku yang **benar-benar dimiliki** perpustakaan.
+4. Isi kolom **Jumlah eks.** per buku (kosong = memakai “Jumlah bawaan”), lalu klik **Impor yang dicentang**
+   (maksimal 60 judul per impor).
+5. Buku yang sudah ada (ID sumber atau ISBN sama) otomatis dilewati dan ditandai ✓.
+6. Lengkapi **sinopsis** lewat menu **Buku → Ubah**, karena API tidak menyediakannya.
+
+Di halaman depan, buku yang punya eksemplar bebas ditandai **“Tersedia X dari Y”**. Buku yang semua eksemplarnya
+dipinjam ditandai **“Sedang dipinjam”** dan bisa diantre. Buku dengan jumlah 0 ditandai **“Belum ada eksemplar”**.
 
 ## Alur antrian peminjaman
 

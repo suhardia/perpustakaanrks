@@ -32,6 +32,8 @@ export interface Buku {
   jumlah: number;
   sinopsis: string | null;
   cover_url: string | null;
+  halaman?: number | null;
+  sumber_id?: string | null;
   created_at: string;
 }
 

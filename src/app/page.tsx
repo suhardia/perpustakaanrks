@@ -3,6 +3,7 @@ import Flash from "@/components/Flash";
 import Sampul from "@/components/Sampul";
 import StatusBuku from "@/components/StatusBuku";
 import AksiPinjam from "@/components/AksiPinjam";
+import QuoteAcak from "@/components/QuoteAcak";
 import { createClient } from "@/lib/supabase/server";
 import { getPengaturan, getProfil } from "@/lib/auth";
 import { getStatusSaya } from "@/lib/data";
@@ -70,6 +71,8 @@ export default async function Beranda(props: PageProps<"/">) {
       {/* ---------- Hero ---------- */}
       <section className="border-b border-garis bg-gradient-to-b from-kertas-2 to-kertas">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14">
+          <div className="grid items-stretch gap-8 lg:grid-cols-[1fr_400px]">
+          <div>
           <p className="text-sm font-semibold tracking-widest text-aksen uppercase">Katalog Koleksi</p>
           <h1 className="mt-2 max-w-2xl text-3xl font-semibold sm:text-4xl">
             Temukan buku, lihat ketersediaannya, dan ajukan antrian peminjaman.
@@ -109,6 +112,9 @@ export default async function Beranda(props: PageProps<"/">) {
               ))}
             </div>
           )}
+          </div>
+          <QuoteAcak />
+          </div>
         </div>
       </section>
 

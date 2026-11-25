@@ -7,6 +7,7 @@ const MENU = [
   ["/admin/sirkulasi", "Sirkulasi"],
   ["/admin/antrian", "Antrian"],
   ["/admin/buku", "Buku"],
+  ["/admin/impor", "Impor Katalog"],
   ["/admin/kategori", "Kategori"],
   ["/admin/anggota", "Anggota"],
   ["/admin/laporan", "Laporan"],

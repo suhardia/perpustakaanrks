@@ -1,4 +1,6 @@
+"use client";
 /* eslint-disable @next/next/no-img-element */
+import { useState } from "react";
 
 // Warna punggung buku untuk sampul otomatis (jika belum ada foto cover)
 const PALET = [
@@ -11,7 +13,7 @@ const PALET = [
   ["#2f4858", "#46677c"],
 ];
 
-/** Sampul buku: foto cover jika ada, jika tidak dibuat otomatis dari judul & pengarang. */
+/** Sampul buku: foto cover jika ada (dan berhasil dimuat), jika tidak dibuat otomatis dari judul & pengarang. */
 export default function Sampul({
   judul,
   pengarang,
@@ -28,10 +30,12 @@ export default function Sampul({
   /** true untuk thumbnail kecil (tanpa teks judul) */
   kecil?: boolean;
 }) {
-  if (coverUrl) {
+  const [rusak, setRusak] = useState(false);
+  if (coverUrl && !rusak) {
     return (
       <img
         src={coverUrl}
+        onError={() => setRusak(true)}
         alt={`Sampul ${judul}`}
         loading="lazy"
         className={`aspect-[2/3] w-full rounded-md object-cover shadow-md ${className}`}
