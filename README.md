@@ -29,7 +29,8 @@ disimpan di **GitHub** dan di-deploy ke **Vercel**.
 - **Impor Katalog** dari API [Buku Indonesia](https://github.com/khrlanamm/buku-indonesia) (±3.000 judul, data CC0):
   cari, centang buku yang dimiliki, isi **jumlah eksemplar**, lalu impor. Judul, pengarang, penerbit, tahun, ISBN,
   kategori, halaman, dan cover (Open Library) terisi otomatis. API ini tidak menyediakan sinopsis, jadi isi manual.
-- Kelola **buku** (upload cover ke Supabase Storage), **kategori**, dan **anggota** (termasuk menjadikan seseorang pustakawan).
+- Kelola **buku**. Cover cukup berupa **link Google Drive** (atau URL gambar lain); yang tersimpan di database hanya
+  teks link, tanpa upload file. Ada pratinjau langsung di form. **kategori**, dan **anggota** (termasuk menjadikan seseorang pustakawan).
 - **Laporan** per periode, buku terpopuler, dan ekspor CSV untuk Excel.
 - **Pengaturan**: lama pinjam, denda, batas pinjam/antrian, batas waktu pengambilan, dan zona waktu.
 
@@ -44,7 +45,7 @@ walaupun ada yang mencoba memanggil API secara langsung.
 Browser ──► Vercel (Next.js: halaman + Server Actions) ──► Supabase
                                                             ├─ Auth       (login anggota & pustakawan)
                                                             ├─ PostgreSQL (tabel, view, fungsi antrian, RLS)
-                                                            └─ Storage    (bucket "cover")
+Cover buku ─► link Google Drive (dibagikan "Siapa saja yang memiliki link"), hanya teks link yang disimpan
 GitHub ── push ──► Vercel otomatis build & deploy ulang
 ```
 
@@ -150,6 +151,28 @@ SQL Editor.
 
 ---
 
+## Cover buku dari Google Drive
+
+Cover **tidak di-upload** ke Supabase; database hanya menyimpan teks link-nya, sehingga kapasitas database tetap kecil.
+
+1. Upload gambar cover ke Google Drive (sebaiknya satu folder khusus, mis. "Cover Perpustakaan").
+2. Klik kanan file gambar → **Bagikan** → *Akses umum* ubah menjadi **“Siapa saja yang memiliki link” (Pelihat)**.
+   Cara cepat: bagikan **folder**-nya seperti itu, maka semua gambar di dalamnya ikut terbuka.
+3. Klik kanan file → **Bagikan → Salin link**, lalu tempel di kolom **Link cover** pada form buku. Pratinjau akan muncul.
+4. Klik **Simpan**.
+
+Bentuk link yang diterima: `https://drive.google.com/file/d/ID/view?usp=sharing`, `…/open?id=ID`, `…/uc?id=ID`,
+atau link gambar biasa (`https://…/gambar.jpg`). **Link folder** dan **link Google Docs** ditolak.
+Aplikasi mengubah link share menjadi alamat gambar (`drive.google.com/thumbnail?id=…`, cadangan
+`lh3.googleusercontent.com/d/…`). Jika keduanya gagal, misalnya karena file belum dibagikan untuk umum, sampul berwarna
+otomatis yang ditampilkan.
+
+Tips: gunakan gambar JPG sekitar 600×900 piksel (di bawah 300 KB) agar halaman cepat dimuat. Buku hasil **Impor
+Katalog** juga hanya menyimpan link cover (dari Open Library).
+
+Cover lama yang pernah di-upload ke Supabase Storage tetap tampil. Untuk mengosongkan Storage, ganti cover buku
+tersebut dengan link Google Drive, lalu hapus file di Supabase → **Storage → cover**.
+
 ## Mengisi katalog dari API Buku Indonesia
 
 1. Jika database dibuat sebelum fitur ini, jalankan sekali `supabase/migrasi-02-impor-buku.sql` di SQL Editor.
@@ -194,7 +217,7 @@ select cron.schedule('antrian-kedaluwarsa', '0 * * * *', $$select public.proses_
 | Banner kuning “Supabase belum dihubungkan” | Environment variable belum diisi di `.env.local` atau Vercel. Setelah mengisi di Vercel, lakukan **Redeploy**. |
 | Daftar berhasil tetapi tidak bisa masuk | Email belum dikonfirmasi. Klik tautan di email, atau matikan *Confirm email* (Langkah 1.5). |
 | Tautan konfirmasi email membuka `localhost` | Atur **Site URL** dan **Redirect URLs** di Supabase (Langkah 4.5). |
-| Upload cover gagal | Pastikan bagian Storage di `schema.sql` ikut dijalankan (bucket `cover`) dan akun Anda berperan admin. Ukuran maksimal 2 MB. |
+| Cover Google Drive tidak tampil (yang muncul sampul berwarna) | File belum dibagikan “Siapa saja yang memiliki link”, atau link yang ditempel adalah link folder. Buka link itu di jendela *incognito*; jika diminta login, berarti belum dibagikan untuk umum. |
 | Tidak muncul menu Panel Pustakawan | Jalankan SQL di Langkah 5, lalu keluar dan masuk lagi. |
 | “API Supabase belum mengenali fungsi email_untuk_login” | Jalankan `supabase/perbaiki-fungsi-login.sql`. Pastikan juga `NEXT_PUBLIC_SUPABASE_URL` di Vercel sama dengan Project URL proyek Supabase tempat SQL dijalankan. |
 | Gagal masuk dengan nama pengguna | Jalankan `supabase/perbaiki-akun-admin.sql` (Langkah 1 untuk diagnosis, Langkah 2 untuk perbaikan). Pesan error di halaman Masuk menunjukkan penyebabnya. |

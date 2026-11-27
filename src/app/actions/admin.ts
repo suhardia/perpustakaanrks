@@ -6,8 +6,7 @@ import { gagal, pathKembali, pesanError, sukses } from "@/lib/aksi";
 import { rupiah } from "@/lib/format";
 import { wajibAdmin } from "@/lib/auth";
 import { ambilBuku, keBaris } from "@/lib/bukuIndonesia";
-
-const MAKS_COVER = 2 * 1024 * 1024;
+import { rapikanLinkCover } from "@/lib/cover";
 
 function teks(form: FormData, key: string): string | null {
   const v = String(form.get(key) ?? "").trim();
@@ -44,24 +43,10 @@ export async function simpanBuku(form: FormData) {
     sinopsis: teks(form, "sinopsis"),
   };
 
-  // Upload cover ke Supabase Storage (bucket "cover")
-  let coverUrl: string | undefined;
-  const file = form.get("cover");
-  if (file instanceof File && file.size > 0) {
-    if (!file.type.startsWith("image/")) gagal(balik, "Cover harus berupa gambar (JPG/PNG/WebP).");
-    if (file.size > MAKS_COVER) gagal(balik, "Ukuran cover maksimal 2 MB.");
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
-    const nama = `${crypto.randomUUID()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from("cover").upload(nama, file, {
-      contentType: file.type,
-      upsert: false,
-    });
-    if (upErr) gagal(balik, `Gagal mengunggah cover: ${upErr.message}`);
-    coverUrl = supabase.storage.from("cover").getPublicUrl(nama).data.publicUrl;
-  }
-  if (form.get("hapus_cover") === "1") coverUrl = "";
-
-  const payload = coverUrl === undefined ? data : { ...data, cover_url: coverUrl || null };
+  // Cover disimpan sebagai teks link saja (Google Drive / URL gambar), tanpa upload file
+  const cover = rapikanLinkCover(String(form.get("cover_link") ?? ""));
+  if (!cover.ok) gagal(balik, cover.pesan);
+  const payload = { ...data, cover_url: cover.link };
 
   if (id) {
     const { error } = await supabase.from("buku").update(payload).eq("id", id);

@@ -1,6 +1,6 @@
-/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import Tombol from "@/components/Tombol";
+import InputLinkCover from "@/components/InputLinkCover";
 import { simpanBuku } from "@/app/actions/admin";
 import type { Buku, Kategori } from "@/lib/types";
 
@@ -52,16 +52,8 @@ export default function FormBuku({ buku, kategori }: { buku?: Buku; kategori: Ka
         <textarea name="sinopsis" rows={8} defaultValue={buku?.sinopsis ?? ""} className="input" placeholder="Ringkasan isi buku yang tampil di halaman depan…" />
       </div>
       <div className="md:col-span-2">
-        <label className="label">Cover (JPG/PNG/WebP, maks 2 MB)</label>
-        <input name="cover" type="file" accept="image/*" className="input file:mr-3 file:rounded file:border-0 file:bg-kertas-2 file:px-2 file:py-1" />
-        {buku?.cover_url && (
-          <div className="mt-3 space-y-2">
-            <img src={buku.cover_url} alt="" className="w-28 rounded shadow" />
-            <label className="flex items-center gap-2 text-xs text-tinta-2">
-              <input type="checkbox" name="hapus_cover" value="1" /> Hapus cover
-            </label>
-          </div>
-        )}
+        <label className="label">Link cover (Google Drive / URL gambar)</label>
+        <InputLinkCover awal={buku?.cover_url ?? null} judul={buku?.judul ?? ""} id={buku?.id ?? 0} />
       </div>
 
       <div className="flex gap-2 md:col-span-6">

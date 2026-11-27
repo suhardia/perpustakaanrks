@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 import { useState } from "react";
+import { alamatGambarCover } from "@/lib/cover";
 
 // Warna punggung buku untuk sampul otomatis (jika belum ada foto cover)
 const PALET = [
@@ -13,7 +14,11 @@ const PALET = [
   ["#2f4858", "#46677c"],
 ];
 
-/** Sampul buku: foto cover jika ada (dan berhasil dimuat), jika tidak dibuat otomatis dari judul & pengarang. */
+/**
+ * Sampul buku: gambar dari link cover (Google Drive / URL gambar) jika berhasil dimuat,
+ * jika tidak dibuat otomatis dari judul & pengarang.
+ * Jika coverUrl bisa berubah (mis. pratinjau form), beri prop key={coverUrl} agar dimuat ulang.
+ */
 export default function Sampul({
   judul,
   pengarang,
@@ -30,14 +35,17 @@ export default function Sampul({
   /** true untuk thumbnail kecil (tanpa teks judul) */
   kecil?: boolean;
 }) {
-  const [rusak, setRusak] = useState(false);
-  if (coverUrl && !rusak) {
+  // Link Google Drive diubah ke alamat gambar; jika gagal dimuat, coba alamat berikutnya, lalu sampul otomatis
+  const kandidat = alamatGambarCover(coverUrl, kecil ? 200 : 800);
+  const [ke, setKe] = useState(0);
+  if (ke < kandidat.length) {
     return (
       <img
-        src={coverUrl}
-        onError={() => setRusak(true)}
+        src={kandidat[ke]}
+        onError={() => setKe((n) => n + 1)}
         alt={`Sampul ${judul}`}
         loading="lazy"
+        referrerPolicy="no-referrer"
         className={`aspect-[2/3] w-full rounded-md object-cover shadow-md ${className}`}
       />
     );
