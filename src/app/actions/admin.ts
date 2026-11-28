@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { gagal, pathKembali, pesanError, sukses } from "@/lib/aksi";
 import { rupiah } from "@/lib/format";
 import { wajibAdmin } from "@/lib/auth";
-import { ambilBuku, keBaris } from "@/lib/bukuIndonesia";
+import { ambilBuku, ambilIndeks, keBaris } from "@/lib/bukuIndonesia";
+import { coverDariIsbn, rapikanJudul, validasiKiriman, type KirimanGoodreads } from "@/lib/goodreads";
 import { rapikanLinkCover } from "@/lib/cover";
 
 function teks(form: FormData, key: string): string | null {
@@ -314,5 +315,109 @@ export async function imporBuku(form: FormData) {
   if (dilewati) info.push(`${dilewati} dilewati karena sudah ada.`);
   if (gagalAmbil) info.push(`${gagalAmbil} gagal diambil dari API.`);
   if (baris.length) info.push("Sinopsis belum tersedia dari API — lengkapi lewat menu Buku → Ubah.");
+  sukses(kembali, info.join(" "));
+}
+
+// ===================== IMPOR CSV GOODREADS =====================
+
+/** Memecah daftar agar URL permintaan ke Supabase tidak terlalu panjang */
+function potong<T>(arr: T[], ukuran: number): T[][] {
+  const hasil: T[][] = [];
+  for (let i = 0; i < arr.length; i += ukuran) hasil.push(arr.slice(i, i + ukuran));
+  return hasil;
+}
+
+/** Menyimpan buku hasil pratinjau file ekspor Goodreads (hanya data buku). */
+export async function imporGoodreads(form: FormData) {
+  await wajibAdmin();
+  const kembali = "/admin/goodreads";
+
+  let mentah: unknown;
+  try {
+    mentah = JSON.parse(String(form.get("data") ?? "[]"));
+  } catch {
+    gagal(kembali, "Data impor tidak terbaca. Pilih ulang file CSV.");
+  }
+  if (!Array.isArray(mentah) || mentah.length === 0) gagal(kembali, "Belum ada buku yang dipilih.");
+  if (mentah.length > 3000) gagal(kembali, "Maksimal 3.000 buku sekali impor.");
+
+  const buku = mentah.map(validasiKiriman).filter((b): b is KirimanGoodreads => b !== null);
+  const tidakValid = mentah.length - buku.length;
+  const rapikan = form.get("rapikan_judul") === "1";
+  const kategoriCadangan = Number(form.get("kategori_cadangan")) || null;
+
+  const supabase = await createClient();
+
+  // 1. Lewati yang sudah ada (ID Goodreads atau ISBN sama)
+  const sudah = new Set<string>();
+  for (const bagian of potong(buku.map((b) => `gr_${b.grId}`), 150)) {
+    const { data } = await supabase.from("buku").select("sumber_id").in("sumber_id", bagian);
+    for (const r of (data ?? []) as { sumber_id: string }[]) sudah.add(r.sumber_id);
+  }
+  const semuaIsbn = buku.map((b) => b.isbn).filter((x): x is string => Boolean(x));
+  for (const bagian of potong(semuaIsbn, 150)) {
+    const { data } = await supabase.from("buku").select("isbn").in("isbn", bagian);
+    for (const r of (data ?? []) as { isbn: string }[]) sudah.add(`isbn:${r.isbn}`);
+  }
+
+  // 2. Kategori: cocokkan ISBN dengan data API Buku Indonesia (jika tersedia)
+  const kategoriIsbn = new Map<string, string>();
+  try {
+    for (const b of await ambilIndeks()) if (b.isbn && b.kategori[0]) kategoriIsbn.set(b.isbn, b.kategori[0]);
+  } catch {
+    // API tidak bisa dihubungi: semua buku memakai kategori cadangan
+  }
+  const petaKategori = new Map<string, number>();
+  const { data: katAda } = await supabase.from("kategori").select("id, nama");
+  for (const k of (katAda ?? []) as { id: number; nama: string }[]) petaKategori.set(k.nama.toLowerCase(), k.id);
+  const namaBaru = [
+    ...new Set(buku.map((b) => (b.isbn ? kategoriIsbn.get(b.isbn) : undefined)).filter((x): x is string => Boolean(x))),
+  ].filter((n) => !petaKategori.has(n.toLowerCase()));
+  if (namaBaru.length) {
+    const { data: baru, error } = await supabase.from("kategori").insert(namaBaru.map((nama) => ({ nama }))).select("id, nama");
+    if (error) gagal(kembali, `Gagal membuat kategori: ${pesanError(error)}`);
+    for (const k of (baru ?? []) as { id: number; nama: string }[]) petaKategori.set(k.nama.toLowerCase(), k.id);
+  }
+
+  // 3. Susun baris tabel buku
+  const isbnDipakai = new Set<string>();
+  const baris = [];
+  let dilewati = 0;
+  let cocokKategori = 0;
+  for (const b of buku) {
+    if (sudah.has(`gr_${b.grId}`) || (b.isbn && (sudah.has(`isbn:${b.isbn}`) || isbnDipakai.has(b.isbn)))) {
+      dilewati++;
+      continue;
+    }
+    if (b.isbn) isbnDipakai.add(b.isbn);
+    const namaKat = b.isbn ? kategoriIsbn.get(b.isbn) : undefined;
+    const katId = namaKat ? petaKategori.get(namaKat.toLowerCase()) ?? null : null;
+    if (katId) cocokKategori++;
+    baris.push({
+      sumber_id: `gr_${b.grId}`,
+      judul: rapikan ? rapikanJudul(b.judul) : b.judul,
+      pengarang: b.pengarang,
+      penerbit: b.penerbit,
+      tahun_terbit: b.tahun,
+      isbn: b.isbn,
+      halaman: b.halaman,
+      jumlah: b.jumlah,
+      cover_url: coverDariIsbn(b.isbn),
+      kategori_id: katId ?? kategoriCadangan,
+      sinopsis: null,
+    });
+  }
+
+  // 4. Simpan bertahap
+  for (const bagian of potong(baris, 200)) {
+    const { error } = await supabase.from("buku").insert(bagian);
+    if (error) gagal(kembali, `Impor berhenti: ${pesanError(error)}. Buku sebelum titik ini sudah tersimpan; impor ulang aman.`);
+  }
+
+  segarkan();
+  const info = [`${baris.length} buku diimpor dari Goodreads.`];
+  if (dilewati) info.push(`${dilewati} dilewati karena sudah ada.`);
+  if (baris.length) info.push(`${cocokKategori} mendapat kategori otomatis dari ISBN.`);
+  if (tidakValid) info.push(`${tidakValid} baris tidak valid diabaikan.`);
   sukses(kembali, info.join(" "));
 }

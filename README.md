@@ -29,6 +29,8 @@ disimpan di **GitHub** dan di-deploy ke **Vercel**.
 - **Impor Katalog** dari API [Buku Indonesia](https://github.com/khrlanamm/buku-indonesia) (±3.000 judul, data CC0):
   cari, centang buku yang dimiliki, isi **jumlah eksemplar**, lalu impor. Judul, pengarang, penerbit, tahun, ISBN,
   kategori, halaman, dan cover (Open Library) terisi otomatis. API ini tidak menyediakan sinopsis, jadi isi manual.
+- **Impor Goodreads**: upload file ekspor Goodreads (`goodreads_library_export.csv`), pilih rak dan buku, isi jumlah
+  eksemplar, lalu impor. Hanya data buku yang diambil; buku yang sudah ada dilewati sehingga aman diimpor ulang.
 - Kelola **buku**. Cover cukup berupa **link Google Drive** (atau URL gambar lain); yang tersimpan di database hanya
   teks link, tanpa upload file. Ada pratinjau langsung di form. **kategori**, dan **anggota** (termasuk menjadikan seseorang pustakawan).
 - **Laporan** per periode, buku terpopuler, dan ekspor CSV untuk Excel.
@@ -54,6 +56,7 @@ GitHub ── push ──► Vercel otomatis build & deploy ulang
 | `supabase/schema.sql` | Seluruh skema database: tabel, view, fungsi, RLS, dan bucket storage |
 | `supabase/seed.sql` | Contoh kategori & 8 buku |
 | `supabase/migrasi-02-impor-buku.sql` | Kolom tambahan untuk fitur Impor Katalog (untuk database lama) |
+| `src/lib/goodreads.ts` | Pembaca file ekspor Goodreads & validasi ISBN |
 | `src/lib/bukuIndonesia.ts` | Klien API Buku Indonesia & pemetaan ke tabel buku |
 | `src/app/api/quote/route.ts` | Proksi quote acak (Quotes Indonesia / Recite) |
 | `supabase/perbaiki-fungsi-login.sql` | Memperbaiki fungsi login nama pengguna (izin & cache API) |
@@ -172,6 +175,29 @@ Katalog** juga hanya menyimpan link cover (dari Open Library).
 
 Cover lama yang pernah di-upload ke Supabase Storage tetap tampil. Untuk mengosongkan Storage, ganti cover buku
 tersebut dengan link Google Drive, lalu hapus file di Supabase → **Storage → cover**.
+
+## Mengimpor koleksi dari Goodreads
+
+Cocok bila daftar buku TBM dicatat di Goodreads.
+
+1. **Di Goodreads:** tambahkan buku yang dimiliki TBM ke rak (shelf) Anda. Agar jumlah eksemplar ikut terbawa, isi
+   **“Owned copies”** di halaman buku (My Books → klik buku → *I own a copy*); jika kosong, dipakai “Jumlah bawaan”.
+2. Ekspor: **My Books → Import and export → Export Library**, lalu unduh `goodreads_library_export.csv`.
+3. Di aplikasi: **Panel Pustakawan → Impor Goodreads**, pilih file tersebut.
+4. Centang **rak** yang berisi buku milik TBM (biasanya bukan `to-read`), periksa daftar, ubah jumlah per buku bila
+   perlu, lalu klik **Impor ke Koleksi**.
+
+Yang diambil hanya data buku: judul, pengarang, penerbit, tahun, ISBN (yang rusak dibuang), halaman, dan jumlah
+dimiliki. Rating, ulasan, dan tanggal baca diabaikan. Data tambahan yang diisi otomatis:
+- **Cover** berupa link Open Library berdasarkan ISBN; jika tidak ada, dipakai sampul otomatis.
+- **Kategori** diambil dari data Buku Indonesia bila ISBN cocok; sisanya mengikuti pilihan kategori cadangan.
+- **Sinopsis** tetap diisi manual.
+
+Buku yang sudah ada (ID Goodreads atau ISBN sama) dilewati. Jadi setelah menambah buku di Goodreads, cukup ekspor
+lagi dan impor ulang: hanya buku baru yang masuk.
+
+Edisi berbeda dari judul yang sama (mis. dua edisi *The Kite Runner*) diimpor sebagai dua buku. Hapus atau gabungkan
+lewat menu Buku bila perlu.
 
 ## Mengisi katalog dari API Buku Indonesia
 
